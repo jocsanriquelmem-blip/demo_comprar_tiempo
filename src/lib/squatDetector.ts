@@ -17,10 +17,22 @@ export type SquatResult = {
 
 type Side = "left" | "right";
 
+type SquatMetrics = {
+  angle?: number;
+  hipY: number;
+  visibleSides: number;
+};
+
 const LANDMARKS = {
   left: { hip: 23, knee: 25, ankle: 27 },
   right: { hip: 24, knee: 26, ankle: 28 },
 } as const;
+
+const MIN_VISIBLE_SIDE_COUNT = 1;
+const DOWN_ANGLE = 125;
+const STANDING_ANGLE = 145;
+const HIP_DROP_DOWN = 0.075;
+const HIP_DROP_STANDING = 0.035;
 
 export class SquatDetector {
   private reps = 0;
@@ -28,22 +40,42 @@ export class SquatDetector {
   private downSince = 0;
   private standingSince = 0;
   private lastCountedAt = 0;
-  private headStandingY: number | undefined;
+  private standingHipY: number | undefined;
 
   update(landmarks: Landmark[] | undefined, now: number): SquatResult {
-    const angle = getBestKneeAngle(landmarks);
+    const metrics = getSquatMetrics(landmarks);
 
-    if (!angle) {
-      return this.updateFromHeadMovement(landmarks, now);
+    if (!metrics || metrics.visibleSides < MIN_VISIBLE_SIDE_COUNT) {
+      this.phase = "searching";
+      this.downSince = 0;
+      this.standingSince = 0;
+      this.standingHipY = undefined;
+      return {
+        phase: this.phase,
+        counted: false,
+        reps: this.reps,
+        message: "Buscando cuerpo completo",
+      };
     }
 
-    const isStanding = angle > 155;
-    const isDown = angle < 105;
+    if (typeof this.standingHipY !== "number") {
+      this.standingHipY = metrics.hipY;
+    }
+
+    const hipDrop = metrics.hipY - this.standingHipY;
+    const angleSaysDown = typeof metrics.angle === "number" && metrics.angle < DOWN_ANGLE;
+    const angleSaysStanding =
+      typeof metrics.angle === "number" && metrics.angle > STANDING_ANGLE;
+    const hipSaysDown = hipDrop > HIP_DROP_DOWN;
+    const hipSaysStanding = hipDrop < HIP_DROP_STANDING;
+    const isDown = angleSaysDown || hipSaysDown;
+    const isStanding = angleSaysStanding || hipSaysStanding;
     let counted = false;
 
     if (this.phase === "searching" && isStanding) {
       this.phase = "standing";
       this.standingSince = now;
+      this.standingHipY = Math.min(this.standingHipY, metrics.hipY);
     }
 
     if (this.phase === "standing" && isDown) {
@@ -54,6 +86,9 @@ export class SquatDetector {
       }
     } else if (this.phase === "standing" && !isDown) {
       this.downSince = 0;
+      if (isStanding) {
+        this.standingHipY = Math.min(this.standingHipY, metrics.hipY);
+      }
     }
 
     if (this.phase === "down" && isStanding) {
@@ -63,6 +98,7 @@ export class SquatDetector {
         counted = true;
         this.lastCountedAt = now;
         this.phase = "cooldown";
+        this.standingHipY = metrics.hipY;
       }
     } else if (this.phase === "down" && !isStanding) {
       this.standingSince = 0;
@@ -76,7 +112,7 @@ export class SquatDetector {
       phase: this.phase,
       counted,
       reps: this.reps,
-      angle,
+      angle: metrics.angle,
       message: counted
         ? "Repetición válida"
         : this.phase === "down"
@@ -97,100 +133,31 @@ export class SquatDetector {
     this.downSince = 0;
     this.standingSince = 0;
     this.lastCountedAt = 0;
-    this.headStandingY = undefined;
-  }
-
-  private updateFromHeadMovement(
-    landmarks: Landmark[] | undefined,
-    now: number,
-  ): SquatResult {
-    const head = landmarks?.[0];
-
-    if (!isVisible(head)) {
-      this.phase = "searching";
-      this.downSince = 0;
-      this.standingSince = 0;
-      this.headStandingY = undefined;
-      return {
-        phase: this.phase,
-        counted: false,
-        reps: this.reps,
-        message: "Buscando cuerpo",
-      };
-    }
-
-    const headY = head.y;
-    this.headStandingY =
-      typeof this.headStandingY === "number"
-        ? Math.min(this.headStandingY, headY)
-        : headY;
-
-    const drop = headY - this.headStandingY;
-    const isDown = drop > 0.075;
-    const isStanding = drop < 0.035;
-    let counted = false;
-
-    if (this.phase === "searching" || this.phase === "cooldown") {
-      if (isStanding && now - this.lastCountedAt > 450) {
-        this.phase = "standing";
-      }
-    }
-
-    if (this.phase === "standing" && isDown) {
-      this.downSince = this.downSince || now;
-      if (now - this.downSince > 160) {
-        this.phase = "down";
-        this.standingSince = 0;
-      }
-    } else if (this.phase === "standing" && !isDown) {
-      this.downSince = 0;
-    }
-
-    if (this.phase === "down" && isStanding) {
-      this.standingSince = this.standingSince || now;
-      if (now - this.standingSince > 160 && now - this.lastCountedAt > 550) {
-        this.reps += 1;
-        counted = true;
-        this.lastCountedAt = now;
-        this.phase = "cooldown";
-        this.headStandingY = headY;
-      }
-    } else if (this.phase === "down" && !isStanding) {
-      this.standingSince = 0;
-    }
-
-    if (this.phase === "cooldown" && now - this.lastCountedAt > 550) {
-      this.phase = "standing";
-    }
-
-    return {
-      phase: this.phase,
-      counted,
-      reps: this.reps,
-      message: counted
-        ? "Repetición válida"
-        : this.phase === "down"
-          ? "Sube con control"
-          : this.phase === "standing"
-            ? "Baja cuando estés listo"
-            : "Listo",
-    };
+    this.standingHipY = undefined;
   }
 }
 
-function getBestKneeAngle(landmarks: Landmark[] | undefined) {
+function getSquatMetrics(landmarks: Landmark[] | undefined): SquatMetrics | undefined {
   if (!landmarks?.length) return undefined;
 
-  const angles = (["left", "right"] as Side[])
-    .map((side) => getSideAngle(landmarks, side))
-    .filter((value): value is number => typeof value === "number");
+  const visibleSides = (["left", "right"] as Side[])
+    .map((side) => getSideMetrics(landmarks, side))
+    .filter((value): value is { angle: number; hipY: number } => Boolean(value));
 
-  if (!angles.length) return undefined;
+  if (!visibleSides.length) return undefined;
 
-  return angles.reduce((sum, value) => sum + value, 0) / angles.length;
+  const angles = visibleSides.map((side) => side.angle);
+  const hipY =
+    visibleSides.reduce((sum, side) => sum + side.hipY, 0) / visibleSides.length;
+
+  return {
+    angle: angles.reduce((sum, value) => sum + value, 0) / angles.length,
+    hipY,
+    visibleSides: visibleSides.length,
+  };
 }
 
-function getSideAngle(landmarks: Landmark[], side: Side) {
+function getSideMetrics(landmarks: Landmark[], side: Side) {
   const indexes = LANDMARKS[side];
   const hip = landmarks[indexes.hip];
   const knee = landmarks[indexes.knee];
@@ -207,9 +174,12 @@ function getSideAngle(landmarks: Landmark[], side: Side) {
   if (!normA || !normB) return undefined;
 
   const cosine = Math.max(-1, Math.min(1, dot / (normA * normB)));
-  return (Math.acos(cosine) * 180) / Math.PI;
+  return {
+    angle: (Math.acos(cosine) * 180) / Math.PI,
+    hipY: hip.y,
+  };
 }
 
 function isVisible(point: Landmark | undefined): point is Landmark {
-  return Boolean(point && (point.visibility ?? 1) > 0.55);
+  return Boolean(point && (point.visibility ?? 1) > 0.35);
 }

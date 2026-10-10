@@ -43,6 +43,12 @@ const SELFIE_VIDEO_CONSTRAINTS: MediaTrackConstraints = {
   aspectRatio: { ideal: 9 / 16 },
 };
 
+const TRACKED_POINT_INDEXES = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+const REQUIRED_SQUAT_SIDES = [
+  [23, 25, 27],
+  [24, 26, 28],
+];
+
 export function CameraPoseTracker({
   disabled,
   onComplete,
@@ -153,17 +159,21 @@ export function CameraPoseTracker({
         };
       };
 
-      const head = landmarks[0];
-      if (!isVisible(head)) return;
-
-      const position = project(head);
       ctx.fillStyle = "#34d399";
       ctx.strokeStyle = "rgba(2, 6, 23, 0.65)";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(position.x, position.y, 11, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+
+      TRACKED_POINT_INDEXES.forEach((index) => {
+        const point = landmarks[index];
+        if (!isVisible(point)) return;
+
+        const position = project(point);
+        const radius = index === 0 ? 9 : 6;
+        ctx.lineWidth = index === 0 ? 4 : 3;
+        ctx.beginPath();
+        ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
     },
     [cameraMode],
   );
@@ -183,7 +193,14 @@ export function CameraPoseTracker({
       const result = landmarker.detectForVideo(video, now);
       const landmarks = result.landmarks[0];
       const detectorResult = detectorRef.current.update(landmarks, now);
-      setStatus(detectorResult.message);
+      const bodyVisible = hasSquatBodyVisible(landmarks);
+      setStatus(
+        bodyVisible
+          ? detectorResult.message
+          : landmarks
+            ? "Aléjate: necesito ver cuerpo completo"
+            : detectorResult.message,
+      );
       setAngle(detectorResult.angle);
       setReps(detectorResult.reps);
 
@@ -462,7 +479,15 @@ function findUltraWideCamera(devices: MediaDeviceInfo[]) {
 }
 
 function isVisible(point: NormalizedLandmark | undefined) {
-  return Boolean(point && (point.visibility ?? 1) > 0.5);
+  return Boolean(point && (point.visibility ?? 1) > 0.35);
+}
+
+function hasSquatBodyVisible(landmarks: NormalizedLandmark[] | undefined) {
+  if (!landmarks) return false;
+
+  return REQUIRED_SQUAT_SIDES.some((indexes) =>
+    indexes.every((index) => isVisible(landmarks[index])),
+  );
 }
 
 function getObjectContainRect(
