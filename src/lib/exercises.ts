@@ -43,6 +43,22 @@ export const EXERCISES = [
     cameraEnabled: false,
   },
   {
+    slug: "flexiones",
+    title: "Flexiones de brazo",
+    shortTitle: "Flexiones",
+    subtitle: "5 reps · contador pronto",
+    reps: 5,
+    cueLabels: ["Manos firmes", "Baja suave", "Sube fuerte"],
+    frames: [
+      "/exercises/pushups/frame-1.svg",
+      "/exercises/pushups/frame-2.svg",
+      "/exercises/pushups/frame-3.svg",
+      "/exercises/pushups/frame-2.svg",
+    ],
+    icon: Flame,
+    cameraEnabled: false,
+  },
+  {
     slug: "salto-cohete",
     title: "Salto cohete",
     shortTitle: "Cohete",

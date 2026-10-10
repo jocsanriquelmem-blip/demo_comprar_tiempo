@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <rect width="640" height="640" rx="64" fill="#08111f"/>
+  <circle cx="472" cy="262" r="34" fill="#34d399"/>
+  <path d="M164 360h320M180 392h360" stroke="#64748b" stroke-width="18" stroke-linecap="round"/>
+  <path d="M150 320l128-68 148 40 46-30M278 252l-58 130M426 292l58 116" fill="none" stroke="#f8fafc" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M146 320l-50 70M472 262l68 86" fill="none" stroke="#a7f3d0" stroke-width="22" stroke-linecap="round"/>
+  <path d="M86 174l18 34 38 8-28 27 4 39-34-18-36 16 8-39-26-29 39-5zM520 112l12 23 26 5-19 19 3 26-24-12-24 11 5-27-18-19 26-4z" fill="#facc15"/>
+  <text x="320" y="548" text-anchor="middle" fill="#a7f3d0" font-family="Arial, sans-serif" font-size="42" font-weight="900">Sube</text>
+</svg>

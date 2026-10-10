@@ -15,11 +15,8 @@ type ActivityClientExercise = {
 
 export function ActivityClient({ exercise }: { exercise: ActivityClientExercise }) {
   const router = useRouter();
-  const { completeChallenge, stats } = useWallet();
-  const reachedCap = stats.availableReward <= 0;
-  const rewardText = reachedCap
-    ? "Límite diario alcanzado"
-    : `Hasta +${stats.availableReward} min virtuales`;
+  const { completeChallenge } = useWallet();
+  const rewardText = "5 min x bonus";
 
   const complete = () => {
     completeChallenge("manual", exercise.slug, exercise.reps);

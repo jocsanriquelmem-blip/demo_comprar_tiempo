@@ -9,10 +9,9 @@ import { useWallet } from "@/hooks/useWallet";
 import {
   FIXED_REWARD_MIN,
   REWARD_MULTIPLIERS,
-  TARGET_SQUATS,
 } from "@/lib/constants";
 import { getExerciseLabel } from "@/lib/exercises";
-import type { RewardMultiplier } from "@/types";
+import type { PendingChallenge, RewardMultiplier } from "@/types";
 
 export default function RewardPage() {
   const router = useRouter();
@@ -24,14 +23,17 @@ export default function RewardPage() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMultiplier, setSelectedMultiplier] =
     useState<RewardMultiplier | null>(null);
+  const [completedChallenge, setCompletedChallenge] =
+    useState<PendingChallenge | null>(null);
 
   const pending = wallet.pendingChallenge;
+  const challenge = pending ?? completedChallenge;
 
   useEffect(() => {
-    if (isLoaded && !pending && !credited) {
+    if (isLoaded && !challenge && !credited) {
       router.replace("/");
     }
-  }, [credited, isLoaded, pending, router]);
+  }, [challenge, credited, isLoaded, router]);
 
   useEffect(() => {
     if (!credited) return;
@@ -43,23 +45,25 @@ export default function RewardPage() {
     return () => window.clearTimeout(timer);
   }, [credited, router]);
 
-  if (!pending && !credited) {
+  if (!challenge && !credited) {
     return null;
   }
 
   const modeLabel =
-    pending?.mode === "camera"
-      ? `${TARGET_SQUATS}/${TARGET_SQUATS} repeticiones detectadas por cámara`
-      : `${getExerciseLabel(pending?.exercise ?? "sentadillas")} completado`;
+    challenge?.mode === "camera"
+      ? `${challenge.reps}/${challenge.reps} repeticiones detectadas por cámara`
+      : `${getExerciseLabel(challenge?.exercise ?? "sentadillas")} completado`;
+  const exerciseLabel = getExerciseLabel(challenge?.exercise ?? "sentadillas");
 
   const award =
     credited?.awarded ??
     (selectedMultiplier ? FIXED_REWARD_MIN * selectedMultiplier : 0);
 
   const spinRoulette = () => {
-    if (isSpinning || selectedMultiplier || !pending) return;
+    if (isSpinning || selectedMultiplier || !challenge) return;
 
     const multiplier = pickMultiplier();
+    setCompletedChallenge(challenge);
     setSelectedMultiplier(multiplier);
     setIsSpinning(true);
 
@@ -77,7 +81,7 @@ export default function RewardPage() {
     <AppShell
       eyebrow="Nivel completado"
       title="¡Lo lograste!"
-      subtitle={`${TARGET_SQUATS} sentadillas desbloquearon la ruleta. Gira y suma ${FIXED_REWARD_MIN} min x bonus.`}
+      subtitle={`Completaste ${challenge?.reps ?? 0} reps de ${exerciseLabel.toLowerCase()}. Gira y suma ${FIXED_REWARD_MIN} min x bonus.`}
       backHref="/"
     >
       <div className="space-y-4">

@@ -48,6 +48,10 @@ const REQUIRED_SQUAT_SIDES = [
   [23, 25, 27],
   [24, 26, 28],
 ];
+const REQUIRED_TORSO_GROUPS = [
+  [11, 12],
+  [23, 24],
+];
 
 export function CameraPoseTracker({
   disabled,
@@ -198,7 +202,7 @@ export function CameraPoseTracker({
         bodyVisible
           ? detectorResult.message
           : landmarks
-            ? "Aléjate: necesito ver cuerpo completo"
+            ? "Muéstrate hasta la cintura o una pierna"
             : detectorResult.message,
       );
       setAngle(detectorResult.angle);
@@ -485,9 +489,14 @@ function isVisible(point: NormalizedLandmark | undefined) {
 function hasSquatBodyVisible(landmarks: NormalizedLandmark[] | undefined) {
   if (!landmarks) return false;
 
-  return REQUIRED_SQUAT_SIDES.some((indexes) =>
+  const hasLegSide = REQUIRED_SQUAT_SIDES.some((indexes) =>
     indexes.every((index) => isVisible(landmarks[index])),
   );
+  const hasTorso = REQUIRED_TORSO_GROUPS.every((indexes) =>
+    indexes.some((index) => isVisible(landmarks[index])),
+  );
+
+  return hasLegSide || hasTorso;
 }
 
 function getObjectContainRect(
