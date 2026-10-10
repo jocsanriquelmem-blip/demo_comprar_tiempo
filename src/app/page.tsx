@@ -1,69 +1,117 @@
-import Image from "next/image";
+"use client";
+
+import Link from "next/link";
+import { Clock, Settings, Trash2 } from "lucide-react";
+import { AppShell, Notice } from "@/components/AppShell";
+import { WalletCard } from "@/components/WalletCard";
+import { useWallet } from "@/hooks/useWallet";
+import { getExerciseLabel } from "@/lib/exercises";
+import { formatDateTime } from "@/lib/wallet";
 
 export default function Home() {
+  const { wallet, isLoaded, isPersistent, stats, resetProgress } = useWallet();
+
+  const handleReset = () => {
+    if (window.confirm("¿Reiniciar el progreso y borrar el historial local?")) {
+      resetProgress();
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <AppShell
+      eyebrow="Tu billetera"
+      title="Tiempo Activo"
+      subtitle="Muévete y gana minutos"
+    >
+      <div className="flex flex-1 flex-col gap-4">
+        <WalletCard wallet={wallet} earnedToday={stats.earnedToday} />
+
+        {!isPersistent ? (
+          <Notice>
+            El navegador no permitió guardar datos. El progreso se mantendrá solo
+            durante esta sesión.
+          </Notice>
+        ) : null}
+
+        <Link
+          href="/actividades"
+          className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-base font-black text-white shadow-sm"
+        >
+          <Clock aria-hidden size={20} />
+          Ganar más tiempo
+        </Link>
+
+        <section className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <p className="text-sm font-bold text-slate-500">Desafíos hoy</p>
+            <p className="mt-1 text-3xl font-black">{stats.completedToday}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <p className="text-sm font-bold text-slate-500">Disponible hoy</p>
+            <p className="mt-1 text-3xl font-black">{stats.availableReward} min</p>
+          </div>
+        </section>
+
+        <Notice>
+          El movimiento se comprueba con cámara; las recompensas son claras,
+          virtuales y limitadas.
+        </Notice>
+
+        <section className="rounded-[24px] border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-black">Historial local</h2>
+            <span className="text-xs font-bold text-slate-500">
+              {wallet.history.length} registros
+            </span>
+          </div>
+          {isLoaded && wallet.history.length ? (
+            <div className="space-y-3">
+              {wallet.history.slice(0, 6).map((item) => (
+                <article
+                  key={item.challengeId}
+                  className="rounded-2xl bg-slate-50 p-3 text-sm"
+                >
+                  <div className="flex justify-between gap-3 font-bold">
+                    <span>
+                      {getExerciseLabel(item.exercise)} ·{" "}
+                      {item.reps === 1 ? "reto" : `${item.reps} reps`}
+                    </span>
+                    <span>+{item.minutesAwarded} min</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {formatDateTime(item.completedAt)} ·{" "}
+                    {item.mode === "camera"
+                      ? "detectado por cámara"
+                      : "registrado sin cámara"}
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+              Todavía no hay desafíos completados.
+            </p>
+          )}
+        </section>
+
+        <div className="grid grid-cols-2 gap-3 pb-4">
+          <Link
+            href="/ajustes"
+            className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Settings aria-hidden size={18} />
+            Ajustes
+          </Link>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-black text-rose-950"
           >
-            Documentation
-          </a>
+            <Trash2 aria-hidden size={18} />
+            Reiniciar
+          </button>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }
