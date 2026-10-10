@@ -21,7 +21,7 @@ type SquatMetrics = {
   angle?: number;
   bodyY: number;
   visibleSides: number;
-  hasTorso: boolean;
+  hasBodyMotion: boolean;
 };
 
 const LANDMARKS = {
@@ -32,8 +32,8 @@ const LANDMARKS = {
 const MIN_VISIBLE_SIDE_COUNT = 1;
 const DOWN_ANGLE = 125;
 const STANDING_ANGLE = 145;
-const BODY_DROP_DOWN = 0.055;
-const BODY_DROP_STANDING = 0.025;
+const BODY_DROP_DOWN = 0.035;
+const BODY_DROP_STANDING = 0.016;
 
 export class SquatDetector {
   private reps = 0;
@@ -48,7 +48,7 @@ export class SquatDetector {
 
     if (
       !metrics ||
-      (metrics.visibleSides < MIN_VISIBLE_SIDE_COUNT && !metrics.hasTorso)
+      (metrics.visibleSides < MIN_VISIBLE_SIDE_COUNT && !metrics.hasBodyMotion)
     ) {
       this.phase = "searching";
       this.downSince = 0;
@@ -148,9 +148,9 @@ function getSquatMetrics(landmarks: Landmark[] | undefined): SquatMetrics | unde
     .map((side) => getSideMetrics(landmarks, side))
     .filter((value): value is { angle: number; bodyY: number } => Boolean(value));
 
-  const torsoY = getTorsoY(landmarks);
+  const bodyMotionY = getBodyMotionY(landmarks);
 
-  if (!visibleSides.length && typeof torsoY !== "number") return undefined;
+  if (!visibleSides.length && typeof bodyMotionY !== "number") return undefined;
 
   const angles = visibleSides.map((side) => side.angle);
   const legBodyY = visibleSides.length
@@ -161,9 +161,9 @@ function getSquatMetrics(landmarks: Landmark[] | undefined): SquatMetrics | unde
     angle: angles.length
       ? angles.reduce((sum, value) => sum + value, 0) / angles.length
       : undefined,
-    bodyY: legBodyY ?? torsoY ?? 0,
+    bodyY: legBodyY ?? bodyMotionY ?? 0,
     visibleSides: visibleSides.length,
-    hasTorso: typeof torsoY === "number",
+    hasBodyMotion: typeof bodyMotionY === "number",
   };
 }
 
@@ -194,14 +194,15 @@ function isVisible(point: Landmark | undefined): point is Landmark {
   return Boolean(point && (point.visibility ?? 1) > 0.35);
 }
 
-function getTorsoY(landmarks: Landmark[]) {
-  const visiblePoints = [11, 12, 23, 24]
+function getBodyMotionY(landmarks: Landmark[]) {
+  const visiblePoints = [0, 11, 12, 23, 24]
     .map((index) => landmarks[index])
     .filter(isVisible);
-  const visibleShoulders = [landmarks[11], landmarks[12]].filter(isVisible);
-  const visibleHips = [landmarks[23], landmarks[24]].filter(isVisible);
+  const upperBodyPoints = [landmarks[0], landmarks[11], landmarks[12]].filter(
+    isVisible,
+  );
 
-  if (!visibleShoulders.length || !visibleHips.length) return undefined;
+  if (visiblePoints.length < 2 || !upperBodyPoints.length) return undefined;
 
   return (
     visiblePoints.reduce((sum, point) => sum + point.y, 0) / visiblePoints.length

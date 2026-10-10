@@ -17,10 +17,22 @@ import {
   type NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
 import { POSE_MODEL_URL, TARGET_SQUATS, WASM_ROOT } from "@/lib/constants";
+import { PushupDetector } from "@/lib/pushupDetector";
 import { SquatDetector } from "@/lib/squatDetector";
 
 type CameraState = "idle" | "loading" | "ready" | "running" | "paused" | "error";
 type CameraMode = "wide" | "selfie";
+type CameraExercise = "squats" | "pushups";
+type DetectorResult = {
+  counted: boolean;
+  reps: number;
+  angle?: number;
+  message: string;
+};
+type ExerciseDetector = {
+  update: (landmarks: NormalizedLandmark[] | undefined, now: number) => DetectorResult;
+  reset: () => void;
+};
 type ZoomCapabilities = MediaTrackCapabilities & {
   zoom?: {
     min?: number;
@@ -55,14 +67,18 @@ const REQUIRED_TORSO_GROUPS = [
 
 export function CameraPoseTracker({
   disabled,
+  exercise = "squats",
   onComplete,
   onManualEntry,
   rewardText,
+  targetReps = TARGET_SQUATS,
 }: {
   disabled?: boolean;
+  exercise?: CameraExercise;
   onComplete: () => void;
   onManualEntry: () => void;
   rewardText: string;
+  targetReps?: number;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const backgroundVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -70,7 +86,7 @@ export function CameraPoseTracker({
   const streamRef = useRef<MediaStream | null>(null);
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
   const rafRef = useRef<number | null>(null);
-  const detectorRef = useRef(new SquatDetector());
+  const detectorRef = useRef<ExerciseDetector>(createDetector(exercise));
   const lastInferRef = useRef(0);
   const completedRef = useRef(false);
   const loopRef = useRef<FrameRequestCallback | null>(null);
@@ -197,12 +213,12 @@ export function CameraPoseTracker({
       const result = landmarker.detectForVideo(video, now);
       const landmarks = result.landmarks[0];
       const detectorResult = detectorRef.current.update(landmarks, now);
-      const bodyVisible = hasSquatBodyVisible(landmarks);
+      const bodyVisible = hasTrackableBodyVisible(landmarks, exercise);
       setStatus(
         bodyVisible
           ? detectorResult.message
           : landmarks
-            ? "Muéstrate hasta la cintura o una pierna"
+            ? getVisibilityMessage(exercise)
             : detectorResult.message,
       );
       setAngle(detectorResult.angle);
@@ -214,7 +230,7 @@ export function CameraPoseTracker({
         clearCanvas();
       }
 
-      if (detectorResult.reps >= TARGET_SQUATS && !completedRef.current) {
+      if (detectorResult.reps >= targetReps && !completedRef.current) {
         completedRef.current = true;
         stopCamera();
         onComplete();
@@ -225,7 +241,7 @@ export function CameraPoseTracker({
     if (loopRef.current) {
       rafRef.current = requestAnimationFrame(loopRef.current);
     }
-  }, [clearCanvas, drawLandmarks, onComplete, stopCamera]);
+  }, [clearCanvas, drawLandmarks, exercise, onComplete, stopCamera, targetReps]);
 
   useEffect(() => {
     loopRef.current = runFrame;
@@ -273,7 +289,7 @@ export function CameraPoseTracker({
         numPoses: 1,
       });
 
-      detectorRef.current.reset();
+      detectorRef.current = createDetector(exercise);
       completedRef.current = false;
       setReps(0);
       setStatus("Listo");
@@ -288,16 +304,16 @@ export function CameraPoseTracker({
       );
       setStatus("Usa Reintentar o continuar sin cámara");
     }
-  }, [cameraMode, disabled, getCameraStream, stopCamera]);
+  }, [cameraMode, disabled, exercise, getCameraStream, stopCamera]);
 
   const start = useCallback(() => {
     if (cameraState !== "ready" && cameraState !== "paused") return;
     setCameraState("running");
-    setStatus("Buscando cuerpo completo");
+    setStatus(exercise === "pushups" ? "Busca brazos y hombros" : "Listo");
     if (loopRef.current) {
       rafRef.current = requestAnimationFrame(loopRef.current);
     }
-  }, [cameraState]);
+  }, [cameraState, exercise]);
 
   const pause = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -360,7 +376,7 @@ export function CameraPoseTracker({
           <div className="grid size-20 place-items-center rounded-full border border-white/15 bg-slate-950/45 text-center shadow-lg backdrop-blur">
             <p className="text-4xl font-black leading-none">
               {reps}
-              <span className="text-base text-emerald-200">/{TARGET_SQUATS}</span>
+              <span className="text-base text-emerald-200">/{targetReps}</span>
             </p>
           </div>
         </div>
@@ -486,8 +502,15 @@ function isVisible(point: NormalizedLandmark | undefined) {
   return Boolean(point && (point.visibility ?? 1) > 0.35);
 }
 
-function hasSquatBodyVisible(landmarks: NormalizedLandmark[] | undefined) {
+function hasTrackableBodyVisible(
+  landmarks: NormalizedLandmark[] | undefined,
+  exercise: CameraExercise,
+) {
   if (!landmarks) return false;
+
+  if (exercise === "pushups") {
+    return hasPushupBodyVisible(landmarks);
+  }
 
   const hasLegSide = REQUIRED_SQUAT_SIDES.some((indexes) =>
     indexes.every((index) => isVisible(landmarks[index])),
@@ -497,6 +520,27 @@ function hasSquatBodyVisible(landmarks: NormalizedLandmark[] | undefined) {
   );
 
   return hasLegSide || hasTorso;
+}
+
+function hasPushupBodyVisible(landmarks: NormalizedLandmark[]) {
+  const hasArmSide = [
+    [11, 13, 15],
+    [12, 14, 16],
+  ].some((indexes) => indexes.every((index) => isVisible(landmarks[index])));
+  const hasUpperBody = [0, 11, 12].filter((index) => isVisible(landmarks[index]))
+    .length >= 2;
+
+  return hasArmSide || hasUpperBody;
+}
+
+function getVisibilityMessage(exercise: CameraExercise) {
+  return exercise === "pushups"
+    ? "Muéstrame brazos y hombros"
+    : "Muéstrate hasta la cintura o una pierna";
+}
+
+function createDetector(exercise: CameraExercise): ExerciseDetector {
+  return exercise === "pushups" ? new PushupDetector() : new SquatDetector();
 }
 
 function getObjectContainRect(
