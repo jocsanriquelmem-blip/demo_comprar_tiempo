@@ -55,6 +55,7 @@ export function CameraPoseTracker({
   rewardText: string;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const backgroundVideoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
@@ -137,7 +138,7 @@ export function CameraPoseTracker({
       canvas.height = canvas.clientHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const rect = getObjectCoverRect(
+      const rect = getObjectContainRect(
         canvas.width,
         canvas.height,
         video.videoWidth || canvas.width,
@@ -242,6 +243,11 @@ export function CameraPoseTracker({
       const video = videoRef.current;
       if (!video) throw new Error("No se pudo preparar la vista de cámara.");
 
+      if (backgroundVideoRef.current) {
+        backgroundVideoRef.current.srcObject = stream;
+        await backgroundVideoRef.current.play();
+      }
+
       video.srcObject = stream;
       await video.play();
 
@@ -294,11 +300,21 @@ export function CameraPoseTracker({
     <section className="relative h-dvh min-h-svh w-screen overflow-hidden bg-slate-950 text-white">
       <div className="absolute inset-0">
         <video
+          ref={backgroundVideoRef}
+          playsInline
+          muted
+          autoPlay
+          aria-hidden
+          className={`h-full w-full scale-110 object-cover opacity-55 blur-2xl ${
+            cameraMode === "selfie" ? "scale-x-[-1]" : ""
+          }`}
+        />
+        <video
           ref={videoRef}
           playsInline
           muted
           autoPlay
-          className={`h-full w-full object-cover ${
+          className={`absolute inset-0 h-full w-full object-contain ${
             cameraMode === "selfie" ? "scale-x-[-1]" : ""
           }`}
         />
@@ -465,7 +481,7 @@ function hasSquatBodyVisible(landmarks: NormalizedLandmark[] | undefined) {
   return requiredIndexes.every((index) => isVisible(landmarks[index]));
 }
 
-function getObjectCoverRect(
+function getObjectContainRect(
   containerWidth: number,
   containerHeight: number,
   mediaWidth: number,
@@ -475,21 +491,21 @@ function getObjectCoverRect(
   const mediaRatio = mediaWidth / mediaHeight;
 
   if (mediaRatio > containerRatio) {
-    const height = containerHeight;
-    const width = height * mediaRatio;
+    const width = containerWidth;
+    const height = width / mediaRatio;
     return {
-      x: (containerWidth - width) / 2,
-      y: 0,
+      x: 0,
+      y: (containerHeight - height) / 2,
       width,
       height,
     };
   }
 
-  const width = containerWidth;
-  const height = width / mediaRatio;
+  const height = containerHeight;
+  const width = height * mediaRatio;
   return {
-    x: 0,
-    y: (containerHeight - height) / 2,
+    x: (containerWidth - width) / 2,
+    y: 0,
     width,
     height,
   };
