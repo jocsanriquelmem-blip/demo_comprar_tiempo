@@ -43,23 +43,6 @@ const SELFIE_VIDEO_CONSTRAINTS: MediaTrackConstraints = {
   aspectRatio: { ideal: 9 / 16 },
 };
 
-const POSE_CONNECTIONS = [
-  [11, 12],
-  [11, 13],
-  [13, 15],
-  [12, 14],
-  [14, 16],
-  [11, 23],
-  [12, 24],
-  [23, 24],
-  [23, 25],
-  [25, 27],
-  [27, 31],
-  [24, 26],
-  [26, 28],
-  [28, 32],
-] as const;
-
 export function CameraPoseTracker({
   disabled,
   onComplete,
@@ -86,7 +69,7 @@ export function CameraPoseTracker({
   const [status, setStatus] = useState("Activa la cámara para comenzar");
   const [error, setError] = useState("");
   const [angle, setAngle] = useState<number | undefined>();
-  const [cameraMode, setCameraMode] = useState<CameraMode>("wide");
+  const [cameraMode, setCameraMode] = useState<CameraMode>("selfie");
 
   const stopCamera = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -169,36 +152,17 @@ export function CameraPoseTracker({
         };
       };
 
-      ctx.lineWidth = 5;
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "rgba(52, 211, 153, 0.72)";
+      const head = landmarks[0];
+      if (!isVisible(head)) return;
 
-      for (const [from, to] of POSE_CONNECTIONS) {
-        const start = landmarks[from];
-        const end = landmarks[to];
-        if (!isVisible(start) || !isVisible(end)) continue;
-
-        const a = project(start);
-        const b = project(end);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-
+      const position = project(head);
       ctx.fillStyle = "#34d399";
       ctx.strokeStyle = "rgba(2, 6, 23, 0.65)";
-      ctx.lineWidth = 3;
-
-      for (const point of landmarks) {
-        if (!isVisible(point)) continue;
-        const position = project(point);
-        ctx.beginPath();
-        ctx.arc(position.x, position.y, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
-
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(position.x, position.y, 11, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     },
     [cameraMode],
   );
