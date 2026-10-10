@@ -153,8 +153,6 @@ export function CameraPoseTracker({
         };
       };
 
-      if (!hasSquatBodyVisible(landmarks)) return;
-
       const head = landmarks[0];
       if (!isVisible(head)) return;
 
@@ -185,14 +183,7 @@ export function CameraPoseTracker({
       const result = landmarker.detectForVideo(video, now);
       const landmarks = result.landmarks[0];
       const detectorResult = detectorRef.current.update(landmarks, now);
-      const bodyVisible = hasSquatBodyVisible(landmarks);
-      setStatus(
-        bodyVisible
-          ? detectorResult.message
-          : landmarks
-            ? "Aléjate: necesito ver piernas"
-            : detectorResult.message,
-      );
+      setStatus(detectorResult.message);
       setAngle(detectorResult.angle);
       setReps(detectorResult.reps);
 
@@ -472,13 +463,6 @@ function findUltraWideCamera(devices: MediaDeviceInfo[]) {
 
 function isVisible(point: NormalizedLandmark | undefined) {
   return Boolean(point && (point.visibility ?? 1) > 0.5);
-}
-
-function hasSquatBodyVisible(landmarks: NormalizedLandmark[] | undefined) {
-  if (!landmarks) return false;
-
-  const requiredIndexes = [0, 23, 24, 25, 26, 27, 28];
-  return requiredIndexes.every((index) => isVisible(landmarks[index]));
 }
 
 function getObjectContainRect(

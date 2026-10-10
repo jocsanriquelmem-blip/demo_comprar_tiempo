@@ -28,20 +28,13 @@ export class SquatDetector {
   private downSince = 0;
   private standingSince = 0;
   private lastCountedAt = 0;
+  private headStandingY: number | undefined;
 
   update(landmarks: Landmark[] | undefined, now: number): SquatResult {
     const angle = getBestKneeAngle(landmarks);
 
     if (!angle) {
-      this.phase = "searching";
-      this.downSince = 0;
-      this.standingSince = 0;
-      return {
-        phase: this.phase,
-        counted: false,
-        reps: this.reps,
-        message: "Buscando cuerpo completo",
-      };
+      return this.updateFromHeadMovement(landmarks, now);
     }
 
     const isStanding = angle > 155;
@@ -104,6 +97,84 @@ export class SquatDetector {
     this.downSince = 0;
     this.standingSince = 0;
     this.lastCountedAt = 0;
+    this.headStandingY = undefined;
+  }
+
+  private updateFromHeadMovement(
+    landmarks: Landmark[] | undefined,
+    now: number,
+  ): SquatResult {
+    const head = landmarks?.[0];
+
+    if (!isVisible(head)) {
+      this.phase = "searching";
+      this.downSince = 0;
+      this.standingSince = 0;
+      this.headStandingY = undefined;
+      return {
+        phase: this.phase,
+        counted: false,
+        reps: this.reps,
+        message: "Buscando cuerpo",
+      };
+    }
+
+    const headY = head.y;
+    this.headStandingY =
+      typeof this.headStandingY === "number"
+        ? Math.min(this.headStandingY, headY)
+        : headY;
+
+    const drop = headY - this.headStandingY;
+    const isDown = drop > 0.075;
+    const isStanding = drop < 0.035;
+    let counted = false;
+
+    if (this.phase === "searching" || this.phase === "cooldown") {
+      if (isStanding && now - this.lastCountedAt > 450) {
+        this.phase = "standing";
+      }
+    }
+
+    if (this.phase === "standing" && isDown) {
+      this.downSince = this.downSince || now;
+      if (now - this.downSince > 160) {
+        this.phase = "down";
+        this.standingSince = 0;
+      }
+    } else if (this.phase === "standing" && !isDown) {
+      this.downSince = 0;
+    }
+
+    if (this.phase === "down" && isStanding) {
+      this.standingSince = this.standingSince || now;
+      if (now - this.standingSince > 160 && now - this.lastCountedAt > 550) {
+        this.reps += 1;
+        counted = true;
+        this.lastCountedAt = now;
+        this.phase = "cooldown";
+        this.headStandingY = headY;
+      }
+    } else if (this.phase === "down" && !isStanding) {
+      this.standingSince = 0;
+    }
+
+    if (this.phase === "cooldown" && now - this.lastCountedAt > 550) {
+      this.phase = "standing";
+    }
+
+    return {
+      phase: this.phase,
+      counted,
+      reps: this.reps,
+      message: counted
+        ? "Repetición válida"
+        : this.phase === "down"
+          ? "Sube con control"
+          : this.phase === "standing"
+            ? "Baja cuando estés listo"
+            : "Listo",
+    };
   }
 }
 
@@ -139,6 +210,6 @@ function getSideAngle(landmarks: Landmark[], side: Side) {
   return (Math.acos(cosine) * 180) / Math.PI;
 }
 
-function isVisible(point: Landmark | undefined) {
+function isVisible(point: Landmark | undefined): point is Landmark {
   return Boolean(point && (point.visibility ?? 1) > 0.55);
 }
