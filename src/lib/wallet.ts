@@ -61,13 +61,7 @@ export function getAvailableRewardWithMultiplier(
   state: WalletState,
   multiplier: RewardMultiplier,
 ) {
-  return Math.max(
-    0,
-    Math.min(
-      FIXED_REWARD_MIN * multiplier,
-      state.dailyBonusCapMinutes - getEarnedToday(state),
-    ),
-  );
+  return FIXED_REWARD_MIN * multiplier;
 }
 
 export function isDailyCap(value: number): value is DailyBonusCapMinutes {

@@ -8,10 +8,14 @@ import type { RewardMultiplier } from "@/types";
 export function RewardCelebration({
   awarded,
   selectedMultiplier,
+  isSpinning,
+  isCredited,
   onSpin,
 }: {
   awarded: number;
   selectedMultiplier: RewardMultiplier | null;
+  isSpinning: boolean;
+  isCredited: boolean;
   onSpin: () => void;
 }) {
   const reduceMotion = useReducedMotion();
@@ -93,10 +97,11 @@ export function RewardCelebration({
         <button
           type="button"
           onClick={onSpin}
-          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200"
+          disabled={isSpinning}
+          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200 disabled:opacity-50"
         >
           <Sparkles aria-hidden size={20} />
-          Girar ruleta
+          {isSpinning ? "Girando..." : "Girar ruleta"}
         </button>
       ) : (
         <motion.div
@@ -111,7 +116,9 @@ export function RewardCelebration({
             x{selectedMultiplier}
           </p>
           <p className="text-sm font-bold text-slate-600">
-            Premio final: +{awarded} minutos virtuales
+            {isCredited
+              ? `+${awarded} minutos en tu billetera`
+              : `Premio final: +${awarded} minutos virtuales`}
           </p>
         </motion.div>
       )}

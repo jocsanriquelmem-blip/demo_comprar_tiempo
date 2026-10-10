@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell, Notice } from "@/components/AppShell";
 import { RewardCelebration } from "@/components/RewardCelebration";
 import { useWallet } from "@/hooks/useWallet";
@@ -12,7 +12,6 @@ import {
   TARGET_SQUATS,
 } from "@/lib/constants";
 import { getExerciseLabel } from "@/lib/exercises";
-import { getAvailableRewardWithMultiplier } from "@/lib/wallet";
 import type { RewardMultiplier } from "@/types";
 
 export default function RewardPage() {
@@ -22,23 +21,27 @@ export default function RewardPage() {
     awarded: number;
     alreadyCredited: boolean;
   }>(null);
+  const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMultiplier, setSelectedMultiplier] =
     useState<RewardMultiplier | null>(null);
 
   const pending = wallet.pendingChallenge;
-  const awardPreview = useMemo(
-    () =>
-      isLoaded && selectedMultiplier
-        ? getAvailableRewardWithMultiplier(wallet, selectedMultiplier)
-        : 0,
-    [isLoaded, selectedMultiplier, wallet],
-  );
 
   useEffect(() => {
     if (isLoaded && !pending && !credited) {
       router.replace("/");
     }
   }, [credited, isLoaded, pending, router]);
+
+  useEffect(() => {
+    if (!credited) return;
+
+    const timer = window.setTimeout(() => {
+      router.push("/");
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [credited, router]);
 
   if (!pending && !credited) {
     return null;
@@ -49,35 +52,46 @@ export default function RewardPage() {
       ? `${TARGET_SQUATS}/${TARGET_SQUATS} repeticiones detectadas por cámara`
       : `${getExerciseLabel(pending?.exercise ?? "sentadillas")} completado`;
 
-  const award = credited?.awarded ?? awardPreview;
+  const award =
+    credited?.awarded ??
+    (selectedMultiplier ? FIXED_REWARD_MIN * selectedMultiplier : 0);
+
+  const spinRoulette = () => {
+    if (isSpinning || selectedMultiplier || !pending) return;
+
+    const multiplier = pickMultiplier();
+    setSelectedMultiplier(multiplier);
+    setIsSpinning(true);
+
+    window.setTimeout(() => {
+      const result = creditPendingReward(multiplier);
+      setCredited({
+        awarded: result.awarded,
+        alreadyCredited: result.alreadyCredited,
+      });
+      setIsSpinning(false);
+    }, 2500);
+  };
 
   return (
     <AppShell
       eyebrow="Nivel completado"
       title="¡Lo lograste!"
-      subtitle={`Ahora gira la ruleta: ${TARGET_SQUATS} sentadillas = ${FIXED_REWARD_MIN} min base por multiplicador.`}
+      subtitle={`${TARGET_SQUATS} sentadillas desbloquearon la ruleta. Gira y suma ${FIXED_REWARD_MIN} min x bonus.`}
       backHref="/"
     >
       <div className="space-y-4">
         <RewardCelebration
           awarded={award}
           selectedMultiplier={selectedMultiplier}
-          onSpin={() => {
-            const index = Math.floor(Math.random() * REWARD_MULTIPLIERS.length);
-            setSelectedMultiplier(REWARD_MULTIPLIERS[index]);
-          }}
+          isSpinning={isSpinning}
+          isCredited={Boolean(credited)}
+          onSpin={spinRoulette}
         />
 
         <Notice>
-          {modeLabel}. La recompensa se limita por el tope diario configurado.
+          {modeLabel}. El premio se acreditará automáticamente al terminar el giro.
         </Notice>
-
-        {selectedMultiplier && awardPreview < FIXED_REWARD_MIN * selectedMultiplier && !credited ? (
-          <Notice>
-            El multiplicador x{selectedMultiplier} supera el remanente diario,
-            por eso se acreditarán {awardPreview} minutos virtuales.
-          </Notice>
-        ) : null}
 
         {credited ? (
           <div className="rounded-[24px] border border-emerald-100 bg-white p-4 text-center shadow-sm">
@@ -90,25 +104,7 @@ export default function RewardPage() {
               Puedes revisar el nuevo saldo e historial en el inicio.
             </p>
           </div>
-        ) : (
-          <button
-            type="button"
-            disabled={!selectedMultiplier}
-            onClick={() => {
-              if (!selectedMultiplier) return;
-              const result = creditPendingReward(selectedMultiplier);
-              setCredited({
-                awarded: result.awarded,
-                alreadyCredited: result.alreadyCredited,
-              });
-            }}
-            className="w-full rounded-2xl bg-slate-950 px-5 py-4 text-base font-black text-white disabled:opacity-40"
-          >
-            {selectedMultiplier
-              ? `Agregar +${awardPreview} minutos a mi billetera`
-              : "Primero gira la ruleta"}
-          </button>
-        )}
+        ) : null}
 
         <Link
           href="/"
@@ -119,4 +115,14 @@ export default function RewardPage() {
       </div>
     </AppShell>
   );
+}
+
+function pickMultiplier(): RewardMultiplier {
+  const random =
+    typeof crypto !== "undefined" && "getRandomValues" in crypto
+      ? crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32
+      : Math.random();
+  const index = Math.floor(random * REWARD_MULTIPLIERS.length);
+
+  return REWARD_MULTIPLIERS[Math.min(index, REWARD_MULTIPLIERS.length - 1)];
 }
