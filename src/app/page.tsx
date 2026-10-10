@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Clock, Settings, Trash2 } from "lucide-react";
 import { AppShell, Notice } from "@/components/AppShell";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import { WalletCard } from "@/components/WalletCard";
 import { useWallet } from "@/hooks/useWallet";
 import { getExerciseLabel } from "@/lib/exercises";
@@ -40,6 +41,7 @@ export default function Home() {
           <Clock aria-hidden size={20} />
           Ganar más tiempo
         </Link>
+        <InstallAppButton />
 
         <section className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">

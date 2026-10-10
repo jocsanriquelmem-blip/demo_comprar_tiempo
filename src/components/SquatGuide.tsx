@@ -39,14 +39,14 @@ export function SquatGuide({
 
   return (
     <main className="min-h-dvh overflow-hidden bg-[#f6fbf8] text-slate-950">
-      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-6 pt-[max(1rem,env(safe-area-inset-top))]">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[max(1.25rem,env(safe-area-inset-left))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
         <header className="mb-4 flex items-center justify-between gap-3">
           <Link
             href="/actividades"
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-sm"
+            className="grid size-12 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-sm"
             aria-label="Volver"
           >
-            <ChevronLeft aria-hidden size={22} />
+            <ChevronLeft aria-hidden size={24} />
           </Link>
           <div className="rounded-full bg-emerald-100 px-3 py-2 text-xs font-black text-emerald-900">
             {rewardText}

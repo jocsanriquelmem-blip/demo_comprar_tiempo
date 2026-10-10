@@ -16,7 +16,7 @@ export function AppShell({
 }) {
   return (
     <main className="min-h-dvh bg-[#f6fbf8] text-slate-950">
-      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 py-5">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[max(1.25rem,env(safe-area-inset-left))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
         <header className="mb-5 flex items-start justify-between gap-4">
           <div>
             {eyebrow ? (
@@ -32,7 +32,7 @@ export function AppShell({
           {backHref ? (
             <Link
               href={backHref}
-              className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm"
+              className="flex min-h-12 shrink-0 items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm"
             >
               Volver
             </Link>

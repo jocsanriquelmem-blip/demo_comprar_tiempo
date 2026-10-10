@@ -137,7 +137,7 @@ export function CameraPoseTracker({
       canvas.height = canvas.clientHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const rect = getObjectContainRect(
+      const rect = getObjectCoverRect(
         canvas.width,
         canvas.height,
         video.videoWidth || canvas.width,
@@ -151,6 +151,8 @@ export function CameraPoseTracker({
           y: rect.y + point.y * rect.height,
         };
       };
+
+      if (!hasSquatBodyVisible(landmarks)) return;
 
       const head = landmarks[0];
       if (!isVisible(head)) return;
@@ -182,7 +184,14 @@ export function CameraPoseTracker({
       const result = landmarker.detectForVideo(video, now);
       const landmarks = result.landmarks[0];
       const detectorResult = detectorRef.current.update(landmarks, now);
-      setStatus(detectorResult.message);
+      const bodyVisible = hasSquatBodyVisible(landmarks);
+      setStatus(
+        bodyVisible
+          ? detectorResult.message
+          : landmarks
+            ? "Aléjate: necesito ver piernas"
+            : detectorResult.message,
+      );
       setAngle(detectorResult.angle);
       setReps(detectorResult.reps);
 
@@ -282,14 +291,14 @@ export function CameraPoseTracker({
   useEffect(() => stopCamera, [stopCamera]);
 
   return (
-    <section className="relative h-dvh min-h-svh overflow-hidden bg-slate-950 text-white">
+    <section className="relative h-dvh min-h-svh w-screen overflow-hidden bg-slate-950 text-white">
       <div className="absolute inset-0">
         <video
           ref={videoRef}
           playsInline
           muted
           autoPlay
-          className={`h-full w-full object-contain ${
+          className={`h-full w-full object-cover ${
             cameraMode === "selfie" ? "scale-x-[-1]" : ""
           }`}
         />
@@ -301,14 +310,14 @@ export function CameraPoseTracker({
 
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.64),rgba(15,23,42,0.05)_34%,rgba(15,23,42,0.62))]" />
 
-      <div className="relative z-10 flex h-dvh min-h-svh flex-col justify-between px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
+      <div className="relative z-10 flex h-dvh min-h-svh flex-col justify-between px-[max(1rem,env(safe-area-inset-left))] pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
         <header className="flex items-start justify-between gap-2">
           <Link
             href="/actividades"
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-slate-950/45 text-white backdrop-blur"
+            className="grid size-12 shrink-0 place-items-center rounded-full bg-slate-950/50 text-white shadow-lg backdrop-blur"
             aria-label="Volver"
           >
-            <ChevronLeft aria-hidden size={22} />
+            <ChevronLeft aria-hidden size={24} />
           </Link>
           <div className="flex items-center gap-2 rounded-full bg-slate-950/45 px-3 py-2 text-right backdrop-blur">
             <span className="text-xs font-black text-emerald-200">{rewardText}</span>
@@ -449,7 +458,14 @@ function isVisible(point: NormalizedLandmark | undefined) {
   return Boolean(point && (point.visibility ?? 1) > 0.5);
 }
 
-function getObjectContainRect(
+function hasSquatBodyVisible(landmarks: NormalizedLandmark[] | undefined) {
+  if (!landmarks) return false;
+
+  const requiredIndexes = [0, 23, 24, 25, 26, 27, 28];
+  return requiredIndexes.every((index) => isVisible(landmarks[index]));
+}
+
+function getObjectCoverRect(
   containerWidth: number,
   containerHeight: number,
   mediaWidth: number,
@@ -459,21 +475,21 @@ function getObjectContainRect(
   const mediaRatio = mediaWidth / mediaHeight;
 
   if (mediaRatio > containerRatio) {
-    const width = containerWidth;
-    const height = width / mediaRatio;
+    const height = containerHeight;
+    const width = height * mediaRatio;
     return {
-      x: 0,
-      y: (containerHeight - height) / 2,
+      x: (containerWidth - width) / 2,
+      y: 0,
       width,
       height,
     };
   }
 
-  const height = containerHeight;
-  const width = height * mediaRatio;
+  const width = containerWidth;
+  const height = width / mediaRatio;
   return {
-    x: (containerWidth - width) / 2,
-    y: 0,
+    x: 0,
+    y: (containerHeight - height) / 2,
     width,
     height,
   };
